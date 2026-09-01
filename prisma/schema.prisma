@@ -1,0 +1,125 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/test-management-app/nextjs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  createdAt DateTime @default(now())
+  testRuns  TestRun[]
+}
+
+model Project {
+  id             String    @id @default(cuid())
+  jiraProjectKey String    @unique
+  name           String
+  createdAt      DateTime  @default(now())
+  releases       Release[]
+}
+
+model Release {
+  id            String    @id @default(cuid())
+  jiraVersionId String    @unique
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name          String
+  status        String    @default("unreleased")
+  releaseDate   DateTime?
+  createdAt     DateTime  @default(now())
+  testRuns      TestRun[]
+}
+
+model TestCase {
+  id             String        @id @default(cuid())
+  title          String
+  preconditions  String?
+  steps          Json          @default("[]")
+  expectedResult String?
+  tags           String[]
+  folder         String?
+  linkedIssueKey String?
+  priority       String        @default("medium")
+  owner          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  testRunItems   TestRunItem[]
+}
+
+model GithubRepo {
+  id            String   @id @default(cuid())
+  owner         String
+  repo          String
+  defaultBranch String   @default("main")
+  addedAt       DateTime @default(now())
+
+  @@unique([owner, repo])
+}
+
+model TestRun {
+  id          String        @id @default(cuid())
+  name        String
+  releaseId   String
+  release     Release       @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  environment String?
+  status      String        @default("in_progress")
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdById String?
+  createdBy   User?         @relation(fields: [createdById], references: [id])
+  items       TestRunItem[]
+}
+
+model TestRunItem {
+  id           String     @id @default(cuid())
+  testRunId    String
+  testRun      TestRun    @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+  testCaseId   String?
+  testCase     TestCase?  @relation(fields: [testCaseId], references: [id])
+  origin       String     @default("manual")
+  status       String     @default("not_run")
+  title        String
+  filePath     String?
+  repoOwner    String?
+  repoName     String?
+  branch       String?
+  tags         String[]
+  notes        String?
+  evidenceUrl  String?
+  lastResultAt DateTime?
+  updatedAt    DateTime   @updatedAt
+  ciResults    CIResult[]
+}
+
+model CIResult {
+  id            String      @id @default(cuid())
+  testRunItemId String
+  testRunItem   TestRunItem @relation(fields: [testRunItemId], references: [id], onDelete: Cascade)
+  provider      String
+  externalRunId String?
+  status        String
+  duration      Int?
+  errorMessage  String?
+  reportedAt    DateTime    @default(now())
+  rawPayload    Json?
+}
+
+model Settings {
+  id             String   @id @default("singleton")
+  jiraBaseUrl    String?
+  jiraEmail      String?
+  jiraApiToken   String?
+  githubPat      String?
+  webhookSecret  String?
+  updatedAt      DateTime @updatedAt
+}
